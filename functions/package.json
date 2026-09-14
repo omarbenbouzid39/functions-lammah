@@ -1,0 +1,15 @@
+{
+  "name": "lammah-functions",
+  "description": "وظائف سحابية لتطبيق لَمّة — مخصصة لمنصة Render مجاناً",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "firebase-admin": "^12.3.1"
+  },
+  "private": true
+}
