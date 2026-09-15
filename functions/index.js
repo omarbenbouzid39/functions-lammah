@@ -49,7 +49,8 @@ app.get("/searchGifs", async (req, res) => {
 
     const url = new URL(endpoint);
     // نستخدم اسم المتغير القديم TENOR_API_KEY الموجود في رندر لكي لا تضطر لتغييره هناك
-    url.searchParams.set("api_key", process.env.TENOR_API_KEY); 
+url.searchParams.set("api_key", "lo2ia2lFQEHVrKyKRoqPnDtWqUmnQyOr");
+
     if (query.length > 0) url.searchParams.set("q", query);
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("offset", String(offset));
