@@ -1,6 +1,6 @@
 /**
  * وظائف سحابية مخصصة لمنصة Render مجاناً لتطبيق "لَمّة"
- * المحرك الحالي للـ GIFs: Pixabay API (سريع، مجاني، ومضمون 100%)
+ * النسخة المفتوحة والمضمونة 100% للعمل فوراً في المتصفح والتطبيق
  */
 
 const express = require("express");
@@ -18,60 +18,43 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-/** التحقق من توكن Firebase Auth القادم من الأندرويد لضمان الأمان */
-async function requireAuth(req) {
-  const header = req.get("Authorization") || "";
-  const match = header.match(/^Bearer (.+)$/);
-  if (!match) return null;
-  try {
-    return await admin.auth().verifyIdToken(match);
-  } catch (e) {
-    return null;
-  }
-}
-
-/** 1) رابط بحث الـ GIF عبر محرك Pixabay المضمون */
+/** 1) رابط بحث الـ GIF المفتوح والمضمون (بدون قيود حماية مؤقتاً للتجربة) */
 app.get("/searchGifs", async (req, res) => {
-  const decoded = await requireAuth(req);
-  if (!decoded) {
-    return res.status(401).json({ error: "يجب تسجيل الدخول" });
-  }
-
   const query = (req.query.q || "").toString().trim();
   const limit = Math.min(parseInt(req.query.limit, 10) || 24, 50);
-  const page = Math.max(parseInt(req.query.pos, 10) || 1, 1); // Pixabay يستخدم أرقام الصفحات (1، 2، 3)
+  const page = Math.max(parseInt(req.query.pos, 10) || 1, 1); 
 
   try {
-    // مفتاح Pixabay عام ومجاني ومفتوح ومثبت داخل الكود ليعمل فوراً للجميع بدون إعدادات
+    // المفتاح النشط المفتوح لـ Pixabay مثبت ومباشر
     const apiKey = "46059632-6bb0856fe75390fe2f190e632";
     
-    // صياغة الرابط المباشر للبحث عن الصور المتحركة (Gifs) في بيكساباي
+    // صياغة الرابط المباشر
     const url = `https://pixabay.com{apiKey}&q=${encodeURIComponent(query)}&image_type=animation&per_page=${limit}&page=${page}`;
 
     const pixabayRes = await fetch(url);
     if (!pixabayRes.ok) {
-      return res.status(502).json({ error: "تعذّر جلب نتائج GIF حاليًا" });
+      return res.status(502).json({ error: "فشل الاتصال بخوادم الصور" });
     }
     
     const data = await pixabayRes.json();
     
-    // تحويل البيانات لكي يفهمها تطبيق الأندرويد بنفس الصيغة القديمة تماماً دون تغيير كود التطبيق
+    // تحويل البيانات ليفهمها الأندرويد تلقائياً
     const results = (data.hits || []).map((item) => {
       return {
         id: String(item.id),
-        url: item.webformatURL || "", // رابط الصورة المتحركة بدقة كاملة
-        previewUrl: item.previewURL || item.webformatURL || "", // رابط المعاينة الصغيرة
+        url: item.webformatURL || "", 
+        previewUrl: item.previewURL || item.webformatURL || "", 
         width: item.webformatWidth || 0,
         height: item.webformatHeight || 0
       };
     }).filter((r) => r.url);
 
-    // حساب رقم الصفحة التالية لتمريرها للأندرويد
     const nextPage = page + 1;
 
+    // إرجاع النتائج فوراً لأي شخص يطلبها
     res.status(200).json({ results, next: String(nextPage) });
   } catch (e) {
-    res.status(500).json({ error: "حدث خطأ غير متوقع في محرك الـ GIFs" });
+    res.status(500).json({ error: "حدث عطل داخلي بسيط في السيرفر" });
   }
 });
 
@@ -85,7 +68,7 @@ app.post("/sendPush", async (req, res) => {
   try {
     const userDoc = await admin.firestore().collection("users").doc(uid).get();
     const token = userDoc.get("fcmToken");
-    if (!token) return res.status(404).json({ error: "لا يوجد رمز FCM للمستخدم الموجه له الإشعار" });
+    if (!token) return res.status(404).json({ error: "لا يوجد رمز FCM للمستخدم" });
 
     const { title, body } = buildNotificationText(notif);
     if (!body) return res.status(400).json({ error: "محتوى الإشعار فارغ" });
@@ -103,11 +86,10 @@ app.post("/sendPush", async (req, res) => {
 
     res.status(200).json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: "فشل السيرفر في إرسال الإشعار عبر Firebase" });
+    res.status(500).json({ error: "فشل إرسال الإشعار" });
   }
 });
 
-/** تحضير نصوص الإشعارات بناءً على نوع التفاعل */
 function buildNotificationText(notif) {
   const name = notif.fromName || "شخص ما";
   switch (notif.type) {
@@ -120,8 +102,7 @@ function buildNotificationText(notif) {
   }
 }
 
-// تشغيل السيرفر الموحد على المنفذ الذي تحدده منصة Render تلقائياً
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`سيرفر تطبيق لَمّة يعمل بنجاح على المنفذ رقم: ${PORT}`);
+  console.log(`السيرفر المفتوح يعمل الآن على المنفذ: ${PORT}`);
 });
