@@ -1,4 +1,4 @@
-```json
+
 {
   "name": "lammah-functions",
   "description": "وظائف Lammah لتطبيق لَمّة — Render",
@@ -17,4 +17,4 @@
   },
   "private": true
 }
-```
+
