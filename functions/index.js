@@ -1,6 +1,6 @@
 /**
  * وظائف سحابية مخصصة لمنصة Render مجاناً لتطبيق "لَمّة"
- * المحرك الحالي للـ GIFs: GIPHY API
+ * المحرك الحالي للـ GIFs: GIPHY API (رابط مباشر صريح)
  */
 
 const express = require("express");
@@ -30,7 +30,7 @@ async function requireAuth(req) {
   }
 }
 
-/** 1) رابط بحث الـ GIF عبر محرك (GIPHY API) مصلح بالكامل */
+/** 1) رابط بحث الـ GIF عبر محرك (GIPHY API) باستخدام الرابط المباشر الصريح */
 app.get("/searchGifs", async (req, res) => {
   const decoded = await requireAuth(req);
   if (!decoded) {
@@ -42,21 +42,16 @@ app.get("/searchGifs", async (req, res) => {
   const offset = parseInt(req.query.pos, 10) || 0; 
 
   try {
-    // تحديد رابط البحث أو الصور الشائعة بناءً على طلب المستخدم
-    const endpoint = query.length > 0
-      ? "https://giphy.com"
-      : "https://giphy.com";
+    // المفتاح النشط الخاص بك تم وضعه هنا مباشرة وبشكل صريح لضمان قراءته بنجاح
+    const apiKey = "lo2ia2lFQEHVrKyKRoqPnDtWqUmnQyOr";
+    
+    // صياغة الرابط المباشر لمنع مشاكل الـ URL وطبقة الأمان
+    const url = query.length > 0
+      ? `https://giphy.com{apiKey}&q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&rating=g`
+      : `https://giphy.com{apiKey}&limit=${limit}&offset=${offset}&rating=g`;
 
-    const url = new URL(endpoint);
-    // نستخدم اسم المتغير القديم TENOR_API_KEY الموجود في رندر لكي لا تضطر لتغييره هناك
-url.searchParams.set("api_key", "lo2ia2lFQEHVrKyKRoqPnDtWqUmnQyOr");
-
-    if (query.length > 0) url.searchParams.set("q", query);
-    url.searchParams.set("limit", String(limit));
-    url.searchParams.set("offset", String(offset));
-    url.searchParams.set("rating", "g"); // محتوى آمن وعائلي
-
-    const giphyRes = await fetch(url.toString());
+    // طلب البيانات مباشرة من الرابط المفرود
+    const giphyRes = await fetch(url);
     if (!giphyRes.ok) {
       return res.status(502).json({ error: "تعذّر جلب نتائج GIF حاليًا" });
     }
