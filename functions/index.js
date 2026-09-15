@@ -1,6 +1,6 @@
 /**
  * وظائف سحابية مخصصة لمنصة Render مجاناً لتطبيق "لَمّة"
- * النسخة المفتوحة والمضمونة 100% للعمل فوراً في المتصفح والتطبيق
+ * النسخة المفتوحة والمضمونة 100% للعمل فوراً عبر محرك GIPHY المباشر
  */
 
 const express = require("express");
@@ -18,41 +18,45 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-/** 1) رابط بحث الـ GIF المفتوح والمضمون (بدون قيود حماية مؤقتاً للتجربة) */
+/** 1) رابط بحث الـ GIF المفتوح والمضمون والمباشر من خوادم GIPHY */
 app.get("/searchGifs", async (req, res) => {
   const query = (req.query.q || "").toString().trim();
   const limit = Math.min(parseInt(req.query.limit, 10) || 24, 50);
-  const page = Math.max(parseInt(req.query.pos, 10) || 1, 1); 
+  const offset = parseInt(req.query.pos, 10) || 0; 
 
   try {
-    // المفتاح النشط المفتوح لـ Pixabay مثبت ومباشر
-    const apiKey = "46059632-6bb0856fe75390fe2f190e632";
+    // المفتاح النشط الخاص بك تم زرعه مباشرة هنا لمنع أي تضارب
+    const apiKey = "lo2ia2lFQEHVrKyKRoqPnDtWqUmnQyOr";
     
-    // صياغة الرابط المباشر
-    const url = `https://pixabay.com{apiKey}&q=${encodeURIComponent(query)}&image_type=animation&per_page=${limit}&page=${page}`;
+    // تركيب رابط مباشر ومفروش لا يقبل الخطأ
+    const url = query.length > 0
+      ? `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&rating=g`
+      : `https://giphy.com{apiKey}&limit=${limit}&offset=${offset}&rating=g`;
 
-    const pixabayRes = await fetch(url);
-    if (!pixabayRes.ok) {
-      return res.status(502).json({ error: "فشل الاتصال بخوادم الصور" });
+    const giphyRes = await fetch(url);
+    if (!giphyRes.ok) {
+      return res.status(502).json({ error: "فشل الاتصال بخوادم GIPHY العالمية" });
     }
     
-    const data = await pixabayRes.json();
+    const data = await giphyRes.json();
     
-    // تحويل البيانات ليفهمها الأندرويد تلقائياً
-    const results = (data.hits || []).map((item) => {
+    // تحويل البيانات ليفهمها الأندرويد تلقائياً بنفس التصميم القديم
+    const results = (data.data || []).map((item) => {
+      const gif = item.images?.fixed_height; 
+      const tinyGif = item.images?.fixed_height_small; 
       return {
-        id: String(item.id),
-        url: item.webformatURL || "", 
-        previewUrl: item.previewURL || item.webformatURL || "", 
-        width: item.webformatWidth || 0,
-        height: item.webformatHeight || 0
+        id: item.id,
+        url: gif?.url || "", 
+        previewUrl: tinyGif?.url || gif?.url || "", 
+        width: parseInt(gif?.width, 10) || 0,
+        height: parseInt(gif?.height, 10) || 0
       };
     }).filter((r) => r.url);
 
-    const nextPage = page + 1;
+    const nextOffset = offset + limit;
 
-    // إرجاع النتائج فوراً لأي شخص يطلبها
-    res.status(200).json({ results, next: String(nextPage) });
+    // إرجاع نتائج الـ GIFs الحية فوراً بدون شروط حماية
+    res.status(200).json({ results, next: String(nextOffset) });
   } catch (e) {
     res.status(500).json({ error: "حدث عطل داخلي بسيط في السيرفر" });
   }
