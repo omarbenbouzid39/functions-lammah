@@ -28,13 +28,7 @@ async function requireAuth(req) {
   const match = header.match(/^Bearer (.+)$/);
   if (!match) return null;
   try {
-    return await admin.auth().verifyIdToken(match[1]);
-  } catch (e) {
-    return null;
-  }
-}
-
-/** 1) رابط بحث الـ GIF عبر تينور */
+/** 1) رابط بحث الـ GIF عبر جي في (GIPHY API) */
 app.get("/searchGifs", async (req, res) => {
   const decoded = await requireAuth(req);
   if (!decoded) {
@@ -43,35 +37,50 @@ app.get("/searchGifs", async (req, res) => {
 
   const query = (req.query.q || "").toString().trim();
   const limit = Math.min(parseInt(req.query.limit, 10) || 24, 50);
-  const pos = (req.query.pos || "").toString();
+  const offset = parseInt(req.query.pos, 10) || 0; // GIPHY يستخدم الأرقام للتنقل بين الصفحات
 
   try {
+    // تحديد رابط البحث أو الصور الشائعة بناءً على طلب المستخدم
     const endpoint = query.length > 0
-      ? "https://googleapis.com"
-      : "https://googleapis.com";
+      ? "https://giphy.com"
+      : "https://giphy.com";
 
     const url = new URL(endpoint);
+    url.searchParams.set("api_key", process.env.TENOR_API_KEY); // سنترك اسم المتغير في رندر كما هو لسهولة العمل
     if (query.length > 0) url.searchParams.set("q", query);
-    url.searchParams.set("key", TENOR_API_KEY);
-    url.searchParams.set("client_key", "lammah_app");
     url.searchParams.set("limit", String(limit));
-    url.searchParams.set("media_filter", "gif");
-    url.searchParams.set("contentfilter", "medium");
-    if (pos) url.searchParams.set("pos", pos);
+    url.searchParams.set("offset", String(offset));
+    url.searchParams.set("rating", "g"); // محتوى آمن وعائلي
 
-    const tenorRes = await fetch(url.toString());
-    if (!tenorRes.ok) {
+    const giphyRes = await fetch(url.toString());
+    if (!giphyRes.ok) {
       return res.status(502).json({ error: "تعذّر جلب نتائج GIF حاليًا" });
     }
-    const data = await tenorRes.json();
-    const results = (data.results || []).map((item) => {
-      const gif = item.media_formats?.gif;
-      const tinyGif = item.media_formats?.tinygif;
+    
+    const data = await giphyRes.json();
+    
+    // تحويل البيانات لكي يفهمها تطبيق الأندرويد بنفس الصيغة القديمة تماماً
+    const results = (data.data || []).map((item) => {
+      const gif = item.images?.fixed_height; // جلب الصورة العادية
+      const tinyGif = item.images?.fixed_height_small; // جلب الصورة المصغرة للمعاينة
       return {
         id: item.id,
         url: gif?.url || "",
         previewUrl: tinyGif?.url || gif?.url || "",
-        width: gif?.dims?.[0] || 0,
+        width: parseInt(gif?.width, 10) || 0,
+        height: parseInt(gif?.height, 10) || 0,
+      };
+    }).filter((r) => r.url);
+
+    // حساب الصفحة التالية للأندروindex
+    const nextOffset = offset + limit;
+
+    res.status(200).json({ results, next: String(nextOffset) });
+  } catch (e) {
+    res.status(500).json({ error: "حدث خطأ غير متوقع" });
+  }
+});
+
         height: gif?.dims?.[1] || 0,
       };
     }).filter((r) => r.url);
