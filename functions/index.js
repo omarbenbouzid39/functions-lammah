@@ -8,7 +8,8 @@ const admin = require("firebase-admin");
 
 // ⚠️ هام جداً: ستحتاج لتحميل ملف مفتاح الخدمة (Service Account Key) من Firebase Console
 // وضعه في نفس المجلد باسم serviceAccountKey.json لتشغيل الحزمة خارج سحابة جوجل.
-const serviceAccount = require("../serviceAccountKey.json");
+// القراءة المباشرة من مسار الملفات السرية الآمن لمنصة Render
+const serviceAccount = require("/etc/secrets/serviceAccountKey.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
