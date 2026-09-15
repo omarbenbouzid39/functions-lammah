@@ -1,10 +1,14 @@
+```json
 {
   "name": "lammah-functions",
-  "description": "وظائف سحابية لتطبيق لَمّة — مخصصة لمنصة Render مجاناً",
-  "version": "1.0.0",
+  "description": "وظائف Lammah لتطبيق لَمّة — Render",
+  "version": "2.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -13,3 +17,4 @@
   },
   "private": true
 }
+```
