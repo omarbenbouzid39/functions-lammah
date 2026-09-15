@@ -1,13 +1,12 @@
 /**
  * وظائف سحابية مخصصة لمنصة Render مجاناً لتطبيق "لَمّة"
+ * المحرك الحالي للـ GIFs: GIPHY API
  */
 
 const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
 
-// ⚠️ هام جداً: ستحتاج لتحميل ملف مفتاح الخدمة (Service Account Key) من Firebase Console
-// وضعه في نفس المجلد باسم serviceAccountKey.json لتشغيل الحزمة خارج سحابة جوجل.
 // القراءة المباشرة من مسار الملفات السرية الآمن لمنصة Render
 const serviceAccount = require("/etc/secrets/serviceAccountKey.json");
 
@@ -19,16 +18,19 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-// جلب مفتاح تينور من بيئة العمل في Render لمنع كشفه
-const TENOR_API_KEY = process.env.TENOR_API_KEY;
-
-/** التحقق من توكن Firebase Auth القادم من الأندرويد */
+/** التحقق من توكن Firebase Auth القادم من الأندرويد لضمان الأمان */
 async function requireAuth(req) {
   const header = req.get("Authorization") || "";
   const match = header.match(/^Bearer (.+)$/);
   if (!match) return null;
   try {
-/** 1) رابط بحث الـ GIF عبر جي في (GIPHY API) */
+    return await admin.auth().verifyIdToken(match);
+  } catch (e) {
+    return null;
+  }
+}
+
+/** 1) رابط بحث الـ GIF عبر محرك (GIPHY API) مصلح بالكامل */
 app.get("/searchGifs", async (req, res) => {
   const decoded = await requireAuth(req);
   if (!decoded) {
@@ -37,7 +39,7 @@ app.get("/searchGifs", async (req, res) => {
 
   const query = (req.query.q || "").toString().trim();
   const limit = Math.min(parseInt(req.query.limit, 10) || 24, 50);
-  const offset = parseInt(req.query.pos, 10) || 0; // GIPHY يستخدم الأرقام للتنقل بين الصفحات
+  const offset = parseInt(req.query.pos, 10) || 0; 
 
   try {
     // تحديد رابط البحث أو الصور الشائعة بناءً على طلب المستخدم
@@ -46,7 +48,8 @@ app.get("/searchGifs", async (req, res) => {
       : "https://giphy.com";
 
     const url = new URL(endpoint);
-    url.searchParams.set("api_key", process.env.TENOR_API_KEY); // سنترك اسم المتغير في رندر كما هو لسهولة العمل
+    // نستخدم اسم المتغير القديم TENOR_API_KEY الموجود في رندر لكي لا تضطر لتغييره هناك
+    url.searchParams.set("api_key", process.env.TENOR_API_KEY); 
     if (query.length > 0) url.searchParams.set("q", query);
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("offset", String(offset));
@@ -59,49 +62,38 @@ app.get("/searchGifs", async (req, res) => {
     
     const data = await giphyRes.json();
     
-    // تحويل البيانات لكي يفهمها تطبيق الأندرويد بنفس الصيغة القديمة تماماً
+    // تحويل البيانات لكي يفهمها تطبيق الأندرويد بنفس الصيغة القديمة تماماً دون تغيير كود التطبيق
     const results = (data.data || []).map((item) => {
-      const gif = item.images?.fixed_height; // جلب الصورة العادية
-      const tinyGif = item.images?.fixed_height_small; // جلب الصورة المصغرة للمعاينة
+      const gif = item.images?.fixed_height; 
+      const tinyGif = item.images?.fixed_height_small; 
       return {
         id: item.id,
         url: gif?.url || "",
         previewUrl: tinyGif?.url || gif?.url || "",
         width: parseInt(gif?.width, 10) || 0,
-        height: parseInt(gif?.height, 10) || 0,
+        height: parseInt(gif?.height, 10) || 0
       };
     }).filter((r) => r.url);
 
-    // حساب الصفحة التالية للأندروindex
     const nextOffset = offset + limit;
 
     res.status(200).json({ results, next: String(nextOffset) });
   } catch (e) {
-    res.status(500).json({ error: "حدث خطأ غير متوقع" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في محرك الـ GIFs" });
   }
 });
 
-        height: gif?.dims?.[1] || 0,
-      };
-    }).filter((r) => r.url);
-
-    res.status(200).json({ results, next: data.next || "" });
-  } catch (e) {
-    res.status(500).json({ error: "حدث خطأ غير متوقع" });
-  }
-});
-
-/** 2) رابط إرسال الإشعارات البديل لـ Render */
+/** 2) رابط إرسال الإشعارات لـ Firebase عبر سيرفر Render */
 app.post("/sendPush", async (req, res) => {
   const { uid, notif } = req.body;
   if (!uid || !notif) {
-    return res.status(400).json({ error: "بيانات ناقصة" });
+    return res.status(400).json({ error: "بيانات ناقصة لإرسال الإشعار" });
   }
 
   try {
     const userDoc = await admin.firestore().collection("users").doc(uid).get();
     const token = userDoc.get("fcmToken");
-    if (!token) return res.status(404).json({ error: "لا يوجد رمز FCM للمستخدم" });
+    if (!token) return res.status(404).json({ error: "لا يوجد رمز FCM للمستخدم الموجه له الإشعار" });
 
     const { title, body } = buildNotificationText(notif);
     if (!body) return res.status(400).json({ error: "محتوى الإشعار فارغ" });
@@ -119,10 +111,11 @@ app.post("/sendPush", async (req, res) => {
 
     res.status(200).json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: "فشل إرسال الإشعار" });
+    res.status(500).json({ error: "فشل السيرفر في إرسال الإشعار عبر Firebase" });
   }
 });
 
+/** تحضير نصوص الإشعارات بناءً على نوع التفاعل */
 function buildNotificationText(notif) {
   const name = notif.fromName || "شخص ما";
   switch (notif.type) {
@@ -135,8 +128,8 @@ function buildNotificationText(notif) {
   }
 }
 
-// تشغيل السيرفر على المنفذ الذي تحدده Render تلقائياً
+// تشغيل السيرفر الموحد على المنفذ الذي تحدده منصة Render تلقائياً
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`سيرفر تطبيق لَمّة يعمل بنجاح على المنفذ رقم: ${PORT}`);
 });
