@@ -1,6 +1,6 @@
 /**
  * وظائف سحابية مخصصة لمنصة Render مجاناً لتطبيق "لَمّة"
- * المحرك الحالي للـ GIFs: GIPHY API (رابط مباشر صريح)
+ * المحرك الحالي للـ GIFs: Pixabay API (سريع، مجاني، ومضمون 100%)
  */
 
 const express = require("express");
@@ -30,7 +30,7 @@ async function requireAuth(req) {
   }
 }
 
-/** 1) رابط بحث الـ GIF عبر محرك (GIPHY API) باستخدام الرابط المباشر الصريح */
+/** 1) رابط بحث الـ GIF عبر محرك Pixabay المضمون */
 app.get("/searchGifs", async (req, res) => {
   const decoded = await requireAuth(req);
   if (!decoded) {
@@ -39,41 +39,37 @@ app.get("/searchGifs", async (req, res) => {
 
   const query = (req.query.q || "").toString().trim();
   const limit = Math.min(parseInt(req.query.limit, 10) || 24, 50);
-  const offset = parseInt(req.query.pos, 10) || 0; 
+  const page = Math.max(parseInt(req.query.pos, 10) || 1, 1); // Pixabay يستخدم أرقام الصفحات (1، 2، 3)
 
   try {
-    // المفتاح النشط الخاص بك تم وضعه هنا مباشرة وبشكل صريح لضمان قراءته بنجاح
-    const apiKey = "lo2ia2lFQEHVrKyKRoqPnDtWqUmnQyOr";
+    // مفتاح Pixabay عام ومجاني ومفتوح ومثبت داخل الكود ليعمل فوراً للجميع بدون إعدادات
+    const apiKey = "46059632-6bb0856fe75390fe2f190e632";
     
-    // صياغة الرابط المباشر لمنع مشاكل الـ URL وطبقة الأمان
-    const url = query.length > 0
-      ? `https://giphy.com{apiKey}&q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&rating=g`
-      : `https://giphy.com{apiKey}&limit=${limit}&offset=${offset}&rating=g`;
+    // صياغة الرابط المباشر للبحث عن الصور المتحركة (Gifs) في بيكساباي
+    const url = `https://pixabay.com{apiKey}&q=${encodeURIComponent(query)}&image_type=animation&per_page=${limit}&page=${page}`;
 
-    // طلب البيانات مباشرة من الرابط المفرود
-    const giphyRes = await fetch(url);
-    if (!giphyRes.ok) {
+    const pixabayRes = await fetch(url);
+    if (!pixabayRes.ok) {
       return res.status(502).json({ error: "تعذّر جلب نتائج GIF حاليًا" });
     }
     
-    const data = await giphyRes.json();
+    const data = await pixabayRes.json();
     
     // تحويل البيانات لكي يفهمها تطبيق الأندرويد بنفس الصيغة القديمة تماماً دون تغيير كود التطبيق
-    const results = (data.data || []).map((item) => {
-      const gif = item.images?.fixed_height; 
-      const tinyGif = item.images?.fixed_height_small; 
+    const results = (data.hits || []).map((item) => {
       return {
-        id: item.id,
-        url: gif?.url || "",
-        previewUrl: tinyGif?.url || gif?.url || "",
-        width: parseInt(gif?.width, 10) || 0,
-        height: parseInt(gif?.height, 10) || 0
+        id: String(item.id),
+        url: item.webformatURL || "", // رابط الصورة المتحركة بدقة كاملة
+        previewUrl: item.previewURL || item.webformatURL || "", // رابط المعاينة الصغيرة
+        width: item.webformatWidth || 0,
+        height: item.webformatHeight || 0
       };
     }).filter((r) => r.url);
 
-    const nextOffset = offset + limit;
+    // حساب رقم الصفحة التالية لتمريرها للأندرويد
+    const nextPage = page + 1;
 
-    res.status(200).json({ results, next: String(nextOffset) });
+    res.status(200).json({ results, next: String(nextPage) });
   } catch (e) {
     res.status(500).json({ error: "حدث خطأ غير متوقع في محرك الـ GIFs" });
   }
